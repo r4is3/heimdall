@@ -66,7 +66,7 @@ def deposite(request):
     if request.method == 'POST':
         if request.POST['type'] == 'update':
             keysend = request.POST['key']
-            if keysend != "":
+            if keysend and keysend != "":
                 sshkey = None
                 if SshKeys.objects.filter(user=userConnected).count() > 0:
                     sshkey = SshKeys.objects.get(user=userConnected)
@@ -89,47 +89,50 @@ def deposite(request):
                 messages.success(request, message)
                 # Redirect to the document list after POST
                 return HttpResponseRedirect(reverse('deposite'))
-            else:
-                messages.success(request, "SSH key is not valid")
-                return HttpResponseRedirect(reverse('deposite'))
+            
+            messages.success(request, "SSH key is not valid")
+            return HttpResponseRedirect(reverse('deposite'))
         else:
             form = UploadSshKeyForm(request.POST, request.FILES)
             if form.is_valid():
                 docfile = request.FILES['docfile']
-                for line in docfile:
-                    if SshKeys.objects.filter(user=userConnected).count() > 0:
-                        sshkey = SshKeys.objects.get(user=userConnected)
-                        sshkey.key = line
-                        sshkey.save()
+                if docfile:
+                    for line in docfile:
+                        if SshKeys.objects.filter(user=userConnected).count() > 0:
+                            sshkey = SshKeys.objects.get(user=userConnected)
+                            sshkey.key = line
+                            sshkey.save()
 
-                        err = Controller.revokeAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
-                        if err is None:
-                            err = Controller.replicateAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
-
+                            err = Controller.revokeAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
                             if err is None:
-                                message = 'Please wait a minute to connect, during the replication on all server finished. Check your mails to know the access updates'
+                                err = Controller.replicateAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
+
+                                if err is None:
+                                    message = 'Please wait a minute to connect, during the replication on all server finished. Check your mails to know the access updates'
+                                else:
+                                    message = err.message
                             else:
                                 message = err.message
+                            messages.success(request, message)
                         else:
-                            message = err.message
-                        messages.success(request, message)
-                    else:
-                        sshkey = SshKeys(user=userConnected, key=line)
-                        sshkey.save()
+                            sshkey = SshKeys(user=userConnected, key=line)
+                            sshkey.save()
 
-                        err = Controller.revokeAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
-                        if err is None:
-                            err = Controller.replicateAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
-
+                            err = Controller.revokeAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
                             if err is None:
-                                message = 'Please wait a minute to connect, during the replication on all server finished. Check your mails to know the access updates' 
+                                err = Controller.replicateAllKeys(Permission.objects.filter(user=request.user), userConnected, sshkey)
+
+                                if err is None:
+                                    message = 'Please wait a minute to connect, during the replication on all server finished. Check your mails to know the access updates' 
+                                else:
+                                    message = err.message
                             else:
                                 message = err.message
-                        else:
-                            message = err.message
-                        messages.success(request, message)
-                # Redirect to the document list after POST
-                return HttpResponseRedirect(reverse('deposite'))
+                            messages.success(request, message)
+                    # Redirect to the document list after POST
+                    return HttpResponseRedirect(reverse('deposite'))
+            messages.success(request, "SSH key is not valid")
+            return HttpResponseRedirect(reverse('deposite'))
     else:
         if SshKeys.objects.filter(user=userConnected).count() > 0:
             key = SshKeys.objects.get(user=userConnected).key
